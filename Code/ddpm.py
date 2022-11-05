@@ -10,6 +10,8 @@ from torch.utils.tensorboard import SummaryWriter
 
 from modules import UNet
 from utils import setup_logging, get_data, save_images
+import numpy as np
+
 
 logging.basicConfig(format="%(asctime)s - %(levelname)s: %(message)s", level=logging.INFO, datefmt="%I:%TM:%S")
 
@@ -38,14 +40,17 @@ class Diffusion:
     def sample_timestepss(self, n):
         return torch.randint(low=1, high=self.noise_steps, size=(n,))
 
-    def sample(self, model, n):
+    def sample(self, model, n, labels, cfg_scale=3):
         logging.info(f"Sampling {n} new images ...")
         model.eval()
         with torch.no_grad():
             x = torch.randn((n, 3, self.img_size, self.img_size)).to(self.device)
             for i in tqdm(reversed(range(1, self.noise_steps)), position=0):
                 t = (torch.ones(n) * i).long().to(self.device)
-                predicted_noise = model(x, t)
+                predicted_noise = model(x, t, labels)
+                if cfg_scale > 0:
+                    uncond_predicted_noise = model(x, labels, None)
+                    predicted_noise = torch.lerp(uncond_predicted_noise, predicted_noise, cfg_scale)
                 alpha = self.alpha[t][:, None, None, None]
                 alpha_hat = self.alpha_hat[t][:, None, None, None]
                 beta = self.beta[t][:, None, None, None]
@@ -64,7 +69,7 @@ def train(args):
     setup_logging(args.run_name)
     device = args.device
     dataloader = get_data(args)
-    model = UNet().to(device)
+    model = UNet(num_classes=args.num_classes).to(device)
     optimizer = optim.AdamW(model.parameters(), lr=args.lr)
     mse = nn.MSELoss()
     diffusion = Diffusion(img_size=args.image_size, device=device)
@@ -74,11 +79,14 @@ def train(args):
     for epoch in range(args.epochs):
         logging.info(f"Starting epoch {epoch}:")
         pbar = tqdm(dataloader)
-        for i, (images, _) in enumerate(pbar):
+        for i, (images, labels) in enumerate(pbar):
             images = images.to(device)
+            labels = labels.to(device)
             t = diffusion.sample_timestepss(images.shape[0]).to(device)
             x_t, noise = diffusion.noise_image(images, t)
-            predicted_noise = model(x_t, t)
+            if np.random.random() < 0.1:
+                labels = None
+            predicted_noise = model(x_t, t, labels)
             loss = mse(noise, predicted_noise)
 
             optimizer.zero_grad()
