@@ -7,7 +7,7 @@ from matplotlib import pyplot as plt
 from torch.utils.data import DataLoader
 
 
-def plot_image(images):
+def plot_images(images):
     plt.figure(figsize=(32,32))
     plt.imshow(torch.cat([
         torch.cat([i for i in images.cpu()], dim=-1)

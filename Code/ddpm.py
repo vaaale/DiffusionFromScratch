@@ -1,3 +1,4 @@
+import copy
 import os
 
 import torch
@@ -8,8 +9,8 @@ from tqdm import tqdm
 import logging
 from torch.utils.tensorboard import SummaryWriter
 
-from modules import UNet
-from utils import setup_logging, get_data, save_images
+from modules import UNet, EMA
+from utils import setup_logging, get_data, save_images, plot_images
 import numpy as np
 
 
@@ -75,6 +76,8 @@ def train(args):
     diffusion = Diffusion(img_size=args.image_size, device=device)
     logger = SummaryWriter(os.path.join("runs", args.run_name))
     l = len(dataloader)
+    ema = EMA(beta=0.995)
+    ema_model = copy.deepcopy(model).eval().requires_grad_(False)
 
     for epoch in range(args.epochs):
         logging.info(f"Starting epoch {epoch}:")
@@ -92,13 +95,20 @@ def train(args):
             optimizer.zero_grad()
             loss.backward()
             optimizer.step()
+            ema.step_ema(ema_model, model)
 
             pbar.set_postfix(MSE=loss.item())
             logger.add_scalar("MSE", loss.item(), global_step=epoch * l + i)
 
-        sampled_images = diffusion.sample(model, n=args.batch_size)
-        save_images(sampled_images, os.path.join("results", args.run_name, f"{epoch}.jpg"))
-        torch.save(model.state_dict(), os.path.join("models", args.run_name, f"ckpt.pt"))
+        if epoch % 10 == 0:
+            labels = torch.arange(10).long().to(device)
+            sampled_images = diffusion.sample(model, n=args.batch_size, labels=labels)
+            ema_sampled_images = diffusion.sample(ema_model, n=args.batch_size, labels=labels)
+            plot_images(sampled_images)
+            save_images(sampled_images, os.path.join("results", args.run_name, f"{epoch}.jpg"))
+            save_images(ema_sampled_images, os.path.join("results", args.run_name, f"{epoch}_ema.jpg"))
+            torch.save(ema_model.state_dict(), os.path.join("models", args.run_name, f"ckpt_ema.pt"))
+            torch.save(model.state_dict(), os.path.join("models", args.run_name, f"ckpt.pt"))
 
 
 def main():

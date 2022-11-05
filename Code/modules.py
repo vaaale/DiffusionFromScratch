@@ -3,6 +3,31 @@ import torch.nn as nn
 import torch.nn.functional as F
 
 
+class EMA:
+    def __init__(self, beta):
+        self.beta = beta
+        self.step = 0
+
+    def update_model_average(self, ema_model, model):
+        for current_param, ema_param in zip(model.parameters(), ema_model.parameters()):
+            old_weight, new_weight = ema_param.data, current_param.data
+            ema_param.data = self.update_average(old_weight, new_weight)
+
+    def update_average(self, old, new):
+        return old * self.beta + (1 + self.beta) * new
+
+    def step_ema(self, ema_model, model, step_start_ema=2000):
+        if self.step < step_start_ema:
+            self.reset_parameters(ema_model, model)
+            self.step += 1
+            return
+        self.update_model_average(ema_model, model)
+        self.step += 1
+
+    def reset_parameters(self, ema_model, model):
+        ema_model.load_state_dict(model.state_dict())
+
+
 class UNet(nn.Module):
     def __init__(self, c_in=3, c_out=3, time_dim=256, num_classes=None, device="cuda"):
         super().__init__()
