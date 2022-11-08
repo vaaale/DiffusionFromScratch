@@ -36,7 +36,7 @@ class Diffusion:
         sqrt_alpha_hat = torch.sqrt(self.alpha_hat[t])[:, None, None, None]
         sqrt_one_minus_alpha_hat = torch.sqrt(1. - self.alpha_hat[t])[:, None, None, None]
         e = torch.randn_like(x)
-        return sqrt_alpha_hat * x * sqrt_one_minus_alpha_hat *e, e
+        return sqrt_alpha_hat * x + sqrt_one_minus_alpha_hat * e, e
 
     def sample_timestepss(self, n):
         return torch.randint(low=1, high=self.noise_steps, size=(n,))
@@ -119,7 +119,7 @@ def main():
     args.epochs = 500
     args.batch_size = 12
     args.image_size = 64
-    args.dataset_path = "/storage/data/DatasetLabeled/val"
+    args.dataset_path = "/data/dataset"
     args.device = "cuda"
     args.lr = 3e-4
     train(args)
