@@ -1,0 +1,22 @@
+setup: ddm
+
+experiment:
+  run_name: DDPM_Conditional
+  device: cpu
+
+
+# Dataset
+dataset:
+  train_path: /mnt/Data/Datasets/Images/CIFAR10/cifar10-64/train
+  val_path: /mnt/Data/Datasets/Images/CIFAR10/cifar10-64/test
+  image_size: 64
+
+model:
+  num_classes: 10
+
+training:
+  batch_size: 12
+  epochs: 500
+
+optimizer:
+  lr: 3.0e-4

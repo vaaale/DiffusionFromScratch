@@ -1,5 +1,6 @@
 import copy
 import os
+from argparse import Namespace
 
 import torch
 import torch.nn as nn
@@ -66,26 +67,32 @@ class Diffusion:
             return x
 
 
-def train(args):
-    setup_logging(args.run_name)
-    device = args.device
-    dataloader = get_data(args.dataset_path, args.batch_size, args.image_size)
-    model = UNet(num_classes=args.num_classes, device=device).to(device)
-    optimizer = optim.AdamW(model.parameters(), lr=args.lr)
+def train(config):
+    exp_ns = Namespace(**config["experiment"])
+    dataset_ns = Namespace(**config["dataset"])
+    model_ns = Namespace(**config["model"])
+    training_ns = Namespace(**config["training"])
+
+    setup_logging(exp_ns.run_name)
+    device = exp_ns.device
+
+    dataloader = get_data(dataset_ns.train_path, training_ns.batch_size, dataset_ns.image_size)
+    model = UNet(num_classes=model_ns.num_classes, device=device).to(device)
+    optimizer = optim.AdamW(model.parameters(), **config["optimizer"])
     mse = nn.MSELoss()
-    diffusion = Diffusion(image_size=args.image_size, device=device)
-    logger = SummaryWriter(os.path.join("runs", args.run_name))
+    diffusion = Diffusion(image_size=dataset_ns.image_size, device=device)
+    logger = SummaryWriter(os.path.join("runs", exp_ns.run_name))
     l = len(dataloader)
     ema = EMA(beta=0.995)
     ema_model = copy.deepcopy(model).eval().requires_grad_(False)
 
-    for epoch in range(args.epochs):
+    for epoch in range(training_ns.epochs):
         logging.info(f"Starting epoch {epoch}:")
         pbar = tqdm(dataloader)
         for i, (images, labels) in enumerate(pbar):
             images = images.to(device)
             labels = labels.to(device)
-            t = diffusion.sample_timestepss(args.batch_size).to(device)
+            t = diffusion.sample_timestepss(training_ns.batch_size).to(device)
             x_t, noise = diffusion.noise_image(images, t)
             if np.random.random() < 0.1:
                 labels = None
@@ -102,42 +109,11 @@ def train(args):
 
         if epoch % 10 == 0:
             labels = torch.arange(10).long().to(device)
-            sampled_images = diffusion.sample(model, n=args.batch_size, labels=labels)
-            ema_sampled_images = diffusion.sample(ema_model, n=args.batch_size, labels=labels)
+            sampled_images = diffusion.sample(model, n=training_ns.batch_size, labels=labels)
+            ema_sampled_images = diffusion.sample(ema_model, n=training_ns.batch_size, labels=labels)
             plot_images(sampled_images)
-            save_images(sampled_images, os.path.join("results", args.run_name, f"{epoch}.jpg"))
-            save_images(ema_sampled_images, os.path.join("results", args.run_name, f"{epoch}_ema.jpg"))
-            torch.save(ema_model.state_dict(), os.path.join("models", args.run_name, f"ckpt_ema.pt"))
-            torch.save(model.state_dict(), os.path.join("models", args.run_name, f"ckpt.pt"))
-
-
-def main():
-    import argparse
-    parser = argparse.ArgumentParser()
-    parser.add_argument('--epochs', type=int, default=500, help='Number of epochs')
-    parser.add_argument('--batch_size', type=int, default=12, help='Batch size')
-    parser.add_argument('--image_size', type=int, default=64, help='Image size')
-    parser.add_argument('--dataset', type=str, default="data", help='Path to dataset')
-    parser.add_argument('--device', type=str, default="cpu", choices=["cuda", "cpu"], help='Path to dataset')
-    parser.add_argument('--lr', type=float, default=3e-4, help='Learning rate')
-    parser.add_argument('--num_classes', type=int, default=None, help='Number of classes in dataset')
-
-    args = parser.parse_args()
-    args.run_name = "DDPM_Unconditional"
-    args.epochs = 500
-    args.batch_size = 12
-    args.image_size = 64
-    args.dataset_path = "/mnt/Data/Datasets/Images/CIFAR10/cifar10-64/train"
-    args.device = "cpu"
-    args.lr = 3e-4
-    args.num_classes = 10
-    train(args)
-
-
-if __name__ == '__main__':
-    main()
-
-
-
-
+            save_images(sampled_images, os.path.join("results", exp_ns.run_name, f"{epoch}.jpg"))
+            save_images(ema_sampled_images, os.path.join("results", exp_ns.run_name, f"{epoch}_ema.jpg"))
+            torch.save(ema_model.state_dict(), os.path.join("models", exp_ns.run_name, f"ckpt_ema.pt"))
+            torch.save(model.state_dict(), os.path.join("models", exp_ns.run_name, f"ckpt.pt"))
 
