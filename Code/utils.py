@@ -22,7 +22,7 @@ def save_images(images, path, **kwargs):
     im.save(path)
 
 
-def get_data(dataset_path, batch_size, img_size=64):
+def get_data(dataset_path, batch_size, img_size=64, workers=2):
     transforms = torchvision.transforms.Compose([
         torchvision.transforms.Resize(80),
         torchvision.transforms.RandomResizedCrop(img_size, scale=(0.8, 1.0)),
@@ -30,7 +30,7 @@ def get_data(dataset_path, batch_size, img_size=64):
         torchvision.transforms.Normalize((0.5, 0.5, 0.5), (0.5, 0.5, 0.5))
     ])
     dataset = torchvision.datasets.ImageFolder(dataset_path, transform=transforms)
-    dataloader = DataLoader(dataset, batch_size=batch_size, shuffle=True)
+    dataloader = DataLoader(dataset, batch_size=batch_size, shuffle=True, num_workers=workers, drop_last=True)
     return dataloader
 
 

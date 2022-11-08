@@ -2,7 +2,7 @@ setup: ddm
 
 experiment:
   run_name: DDPM_Conditional
-  device: cpu
+  device: cuda
 
 
 # Dataset
@@ -13,10 +13,13 @@ dataset:
 
 model:
   num_classes: 10
+  ema_beta: 0.995
 
 training:
-  batch_size: 12
+  batch_size: 16
   epochs: 500
+  logging_freq: 2
+  workers: 3
 
 optimizer:
   lr: 3.0e-4

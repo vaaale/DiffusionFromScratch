@@ -76,14 +76,14 @@ def train(config):
     setup_logging(exp_ns.run_name)
     device = exp_ns.device
 
-    dataloader = get_data(dataset_ns.train_path, training_ns.batch_size, dataset_ns.image_size)
+    dataloader = get_data(dataset_ns.train_path, training_ns.batch_size, dataset_ns.image_size, training_ns.workers)
     model = UNet(num_classes=model_ns.num_classes, device=device).to(device)
     optimizer = optim.AdamW(model.parameters(), **config["optimizer"])
     mse = nn.MSELoss()
     diffusion = Diffusion(image_size=dataset_ns.image_size, device=device)
-    logger = SummaryWriter(os.path.join("runs", exp_ns.run_name))
+    logger = SummaryWriter(os.path.join("Results", exp_ns.run_name))
     l = len(dataloader)
-    ema = EMA(beta=0.995)
+    ema = EMA(beta=model_ns.ema_beta)
     ema_model = copy.deepcopy(model).eval().requires_grad_(False)
 
     for epoch in range(training_ns.epochs):
@@ -107,10 +107,10 @@ def train(config):
             pbar.set_postfix(MSE=loss.item())
             logger.add_scalar("MSE", loss.item(), global_step=epoch * l + i)
 
-        if epoch % 10 == 0:
+        if epoch % training_ns.logging_freq == 0:
             labels = torch.arange(10).long().to(device)
-            sampled_images = diffusion.sample(model, n=training_ns.batch_size, labels=labels)
-            ema_sampled_images = diffusion.sample(ema_model, n=training_ns.batch_size, labels=labels)
+            sampled_images = diffusion.sample(model, n=len(labels), labels=labels)
+            ema_sampled_images = diffusion.sample(ema_model, n=len(labels), labels=labels)
             plot_images(sampled_images)
             save_images(sampled_images, os.path.join("results", exp_ns.run_name, f"{epoch}.jpg"))
             save_images(ema_sampled_images, os.path.join("results", exp_ns.run_name, f"{epoch}_ema.jpg"))
