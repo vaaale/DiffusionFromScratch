@@ -29,11 +29,11 @@ class EMA:
 
 
 class UNet(nn.Module):
-    def __init__(self, c_in=3, c_out=3, time_dim=256, num_classes=None, device="cuda"):
+    def __init__(self, c_in=3, c_out=3, time_dim=256, num_classes=None, device="cpu"):
         super().__init__()
         self.device = device
         self.time_dim = time_dim
-        self.inc = DoubleConv(c_in, 64)
+        self.inc1 = DoubleConv(c_in, 64)
         self.down1 = Down(64, 128)
         self.sa1 = SelfAttention(128, 32)
         self.down2 = Down(128, 256)
@@ -74,7 +74,7 @@ class UNet(nn.Module):
             t += self.label_emb(y)
 
         x1 = self.inc1(x)
-        x2 = self.down(x1, t)
+        x2 = self.down1(x1, t)
         x2 = self.sa1(x2)
 
         x3 = self.down2(x2, t)
@@ -181,8 +181,8 @@ class SelfAttention(nn.Module):
             nn.Linear(channels, channels),
         )
 
-    def forwarad(self, x):
-        x = x.view(-1, self.channels, self.size * self.size).swapaxes(1, 1)
+    def forward(self, x):
+        x = x.view(-1, self.channels, self.size * self.size).swapaxes(1, 2)
         x_ln = self.ln(x)
         attention_value, _ = self.mha(x_ln, x_ln, x_ln)
         attention_value = attention_value + x

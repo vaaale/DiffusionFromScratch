@@ -18,9 +18,9 @@ logging.basicConfig(format="%(asctime)s - %(levelname)s: %(message)s", level=log
 
 
 class Diffusion:
-    def __init__(self, noise_steps=1000, beta_start=1e-4, beta_end=0.002, img_size=64, device="cpu"):
+    def __init__(self, noise_steps=1000, beta_start=1e-4, beta_end=0.002, image_size=64, device="cpu"):
         self.device = device
-        self.img_size = img_size
+        self.image_size = image_size
         self.beta_end = beta_end
         self.noise_steps = noise_steps
         self.beta_start = beta_start
@@ -45,7 +45,7 @@ class Diffusion:
         logging.info(f"Sampling {n} new images ...")
         model.eval()
         with torch.no_grad():
-            x = torch.randn((n, 3, self.img_size, self.img_size)).to(self.device)
+            x = torch.randn((n, 3, self.image_size, self.image_size)).to(self.device)
             for i in tqdm(reversed(range(1, self.noise_steps)), position=0):
                 t = (torch.ones(n) * i).long().to(self.device)
                 predicted_noise = model(x, t, labels)
@@ -69,11 +69,11 @@ class Diffusion:
 def train(args):
     setup_logging(args.run_name)
     device = args.device
-    dataloader = get_data(args)
-    model = UNet(num_classes=args.num_classes).to(device)
+    dataloader = get_data(args.dataset_path, args.batch_size, args.image_size)
+    model = UNet(num_classes=args.num_classes, device=device).to(device)
     optimizer = optim.AdamW(model.parameters(), lr=args.lr)
     mse = nn.MSELoss()
-    diffusion = Diffusion(img_size=args.image_size, device=device)
+    diffusion = Diffusion(image_size=args.image_size, device=device)
     logger = SummaryWriter(os.path.join("runs", args.run_name))
     l = len(dataloader)
     ema = EMA(beta=0.995)
@@ -85,7 +85,7 @@ def train(args):
         for i, (images, labels) in enumerate(pbar):
             images = images.to(device)
             labels = labels.to(device)
-            t = diffusion.sample_timestepss(images.shape[0]).to(device)
+            t = diffusion.sample_timestepss(args.batch_size).to(device)
             x_t, noise = diffusion.noise_image(images, t)
             if np.random.random() < 0.1:
                 labels = None
@@ -114,14 +114,23 @@ def train(args):
 def main():
     import argparse
     parser = argparse.ArgumentParser()
+    parser.add_argument('--epochs', type=int, default=500, help='Number of epochs')
+    parser.add_argument('--batch_size', type=int, default=12, help='Batch size')
+    parser.add_argument('--image_size', type=int, default=64, help='Image size')
+    parser.add_argument('--dataset', type=str, default="data", help='Path to dataset')
+    parser.add_argument('--device', type=str, default="cpu", choices=["cuda", "cpu"], help='Path to dataset')
+    parser.add_argument('--lr', type=float, default=3e-4, help='Learning rate')
+    parser.add_argument('--num_classes', type=int, default=None, help='Number of classes in dataset')
+
     args = parser.parse_args()
     args.run_name = "DDPM_Unconditional"
     args.epochs = 500
     args.batch_size = 12
     args.image_size = 64
-    args.dataset_path = "/data/dataset"
-    args.device = "cuda"
+    args.dataset_path = "/mnt/Data/Datasets/Images/CIFAR10/cifar10-64/train"
+    args.device = "cpu"
     args.lr = 3e-4
+    args.num_classes = 10
     train(args)
 
 

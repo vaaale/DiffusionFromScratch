@@ -22,20 +22,20 @@ def save_images(images, path, **kwargs):
     im.save(path)
 
 
-def get_data(args):
+def get_data(dataset_path, batch_size, img_size=64):
     transforms = torchvision.transforms.Compose([
         torchvision.transforms.Resize(80),
-        torchvision.transforms.RandomResizedCrop(args.img_size, scale=(0.8, 1.0)),
+        torchvision.transforms.RandomResizedCrop(img_size, scale=(0.8, 1.0)),
         torchvision.transforms.ToTensor(),
         torchvision.transforms.Normalize((0.5, 0.5, 0.5), (0.5, 0.5, 0.5))
     ])
-    dataset = torchvision.datasets.ImageFolder(args.dataset_path, transform=transforms)
-    dataloader = DataLoader(dataset, batch_size=args.batch_size, shuffle=True)
+    dataset = torchvision.datasets.ImageFolder(dataset_path, transform=transforms)
+    dataloader = DataLoader(dataset, batch_size=batch_size, shuffle=True)
     return dataloader
 
 
 def setup_logging(run_name):
-    os.makedirs("models", exist_ok=True)
-    os.makedirs("results", exist_ok=True)
-    os.makedirs(os.path.join("models", run_name), exist_ok=True)
-    os.makedirs(os.path.join("results", run_name), exist_ok=True)
+    os.makedirs("Models", exist_ok=True)
+    os.makedirs("Results", exist_ok=True)
+    os.makedirs(os.path.join("Models", run_name), exist_ok=True)
+    os.makedirs(os.path.join("Results", run_name), exist_ok=True)
